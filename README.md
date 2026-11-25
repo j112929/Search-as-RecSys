@@ -4,7 +4,7 @@
 
 - **标签 / 关键词召回（BM25）**：匹配用户历史偏好标签
 - **热度特征加权（`rank_feature`）**：使用饱和函数引入商品热度分
-- **向量语义 / 双塔召回（`knn_vector` + HNSW）**：基于 8 维用户兴趣向量做近邻召回
+- **向量语义 / 双塔召回（`knn_vector` + HNSW）**：基于用户兴趣向量做近邻召回
 - **混合检索管道（`search_pipeline`）**：对两路分数进行 `min_max` 归一化并按权重加权融合
 - **业务规则过滤**：支持库存状态（`in_stock: true`）与已购商品去重（`must_not`）
 
@@ -16,9 +16,15 @@
 docker compose up -d
 ```
 
-2. 安装 Python 依赖并运行推荐脚本：
+2. 安装 Python 依赖并运行基础混合推荐 Demo：
 
 ```bash
 pip install -r requirements.txt
 python rec_demo.py
+```
+
+3. 运行 PyTorch 双塔模型训练、向量局部同步与实时推荐 Demo（需先运行 `rec_demo.py` 初始化索引）：
+
+```bash
+python two_tower_demo.py
 ```
