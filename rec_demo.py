@@ -6,7 +6,7 @@ INDEX_NAME = "rec_products"
 PIPELINE_NAME = "rec-hybrid-pipeline"
 VECTOR_DIM = 8
 
-# 1. 连接本地 OpenSearch
+# 1. Connect to local OpenSearch
 client = OpenSearch(
     hosts=[{"host": "localhost", "port": 9200}],
     use_ssl=False,
@@ -18,18 +18,18 @@ def wait_for_opensearch(retries: int = 30) -> None:
     for _ in range(retries):
         try:
             if client.ping():
-                print("OpenSearch 已就绪。")
+                print("OpenSearch is ready.")
                 return
         except Exception:
             pass
         time.sleep(2)
-    raise RuntimeError("连接 OpenSearch 超时，请检查 Docker 容器状态。")
+    raise RuntimeError("Timed out connecting to OpenSearch. Please check Docker container status.")
 
 
 def setup_search_pipeline() -> None:
-    """注册混合检索归一化与加权融合管道：35% 规则/文本/热度，65% 向量相似度"""
+    """Register hybrid search normalization and weighted fusion pipeline: 35% rules/text/popularity, 65% vector similarity."""
     pipeline_body = {
-        "description": "推荐系统多路分数 min-max 归一化与加权平均融合",
+        "description": "Min-max normalization and weighted average fusion for multi-channel recommendation scores",
         "phase_results_processors": [
             {
                 "normalization-processor": {
@@ -45,11 +45,11 @@ def setup_search_pipeline() -> None:
     client.transport.perform_request(
         "PUT", f"/_search/pipeline/{PIPELINE_NAME}", body=pipeline_body
     )
-    print(f"Search Pipeline [{PIPELINE_NAME}] 创建成功。")
+    print(f"Search Pipeline [{PIPELINE_NAME}] created successfully.")
 
 
 def setup_index() -> None:
-    """创建包含文本、类别、热度特征与 HNSW 向量字段的商品索引"""
+    """Create product index with text, category, popularity feature, and HNSW vector fields."""
     if client.indices.exists(index=INDEX_NAME):
         client.indices.delete(index=INDEX_NAME)
 
@@ -85,7 +85,7 @@ def setup_index() -> None:
         },
     }
     client.indices.create(index=INDEX_NAME, body=mapping)
-    print(f"索引 [{INDEX_NAME}] 创建成功。")
+    print(f"Index [{INDEX_NAME}] created successfully.")
 
 
 def normalize(vec: list[float]) -> list[float]:
@@ -95,12 +95,12 @@ def normalize(vec: list[float]) -> list[float]:
 
 
 def ingest_mock_products() -> None:
-    """写入 10 条模拟商品（8 维向量：[数码, 音频, 户外, 居家, 性价比, 旗舰, 便携, 颜值]）"""
+    """Ingest 10 mock products (8-D vector: [tech, audio, outdoor, home, value, flagship, portable, aesthetic])."""
     raw_items = [
         {
             "item_id": "p001",
-            "title": "Sony WH-1000XM5 头戴式无线降噪耳机",
-            "tags": "降噪 无线 蓝牙耳机 通勤 高端音频",
+            "title": "Sony WH-1000XM5 Wireless Noise-Canceling Over-Ear Headphones",
+            "tags": "noise-canceling wireless bluetooth headphones commute flagship audio",
             "category": "audio",
             "brand": "Sony",
             "price": 2499.0,
@@ -110,8 +110,8 @@ def ingest_mock_products() -> None:
         },
         {
             "item_id": "p002",
-            "title": "Bose QuietComfort Ultra 消噪耳塞",
-            "tags": "降噪 无线 蓝牙耳机 便携 运动",
+            "title": "Bose QuietComfort Ultra Noise-Canceling Earbuds",
+            "tags": "noise-canceling wireless bluetooth earbuds portable sports",
             "category": "audio",
             "brand": "Bose",
             "price": 1999.0,
@@ -121,8 +121,8 @@ def ingest_mock_products() -> None:
         },
         {
             "item_id": "p003",
-            "title": "国产性价比降噪蓝牙耳机 AirLite",
-            "tags": "降噪 无线 蓝牙耳机 学生 性价比",
+            "title": "AirLite Budget Wireless Noise-Canceling Bluetooth Earbuds",
+            "tags": "noise-canceling wireless bluetooth headphones student value",
             "category": "audio",
             "brand": "SoundX",
             "price": 299.0,
@@ -132,19 +132,19 @@ def ingest_mock_products() -> None:
         },
         {
             "item_id": "p004",
-            "title": "缺货限量版 Hi-Fi 监听耳机",
-            "tags": "Hi-Fi 监听 有线 音频发烧",
+            "title": "Out-of-Stock Limited Edition Hi-Fi Studio Monitor Headphones",
+            "tags": "Hi-Fi studio monitor wired audiophile",
             "category": "audio",
             "brand": "Sennheiser",
             "price": 3999.0,
-            "in_stock": False,  # 测试库存过滤
+            "in_stock": False,  # Test inventory filtering
             "popularity_score": 99.0,
             "item_vector": normalize([0.8, 0.99, 0.0, 0.3, 0.05, 0.98, 0.2, 0.6]),
         },
         {
             "item_id": "p005",
-            "title": "Apple MacBook Air M3 轻薄笔记本",
-            "tags": "轻薄 办公 数码 旗舰 便携",
+            "title": "Apple MacBook Air M3 Ultraportable Laptop",
+            "tags": "thin-and-light office tech flagship portable",
             "category": "electronics",
             "brand": "Apple",
             "price": 8999.0,
@@ -154,8 +154,8 @@ def ingest_mock_products() -> None:
         },
         {
             "item_id": "p006",
-            "title": "Keychron K2 Pro 客制化无线机械键盘",
-            "tags": "无线 机械键盘 办公 桌面美学",
+            "title": "Keychron K2 Pro Custom Wireless Mechanical Keyboard",
+            "tags": "wireless mechanical keyboard office desk-setup aesthetic",
             "category": "electronics",
             "brand": "Keychron",
             "price": 549.0,
@@ -165,8 +165,8 @@ def ingest_mock_products() -> None:
         },
         {
             "item_id": "p007",
-            "title": "始祖鸟 Beta 轻量化防水冲锋衣",
-            "tags": "户外 徒步 防水 冲锋衣 轻便",
+            "title": "Arc'teryx Beta Lightweight Waterproof Hardshell Jacket",
+            "tags": "outdoor hiking waterproof hardshell jacket lightweight",
             "category": "outdoor",
             "brand": "Arc'teryx",
             "price": 4500.0,
@@ -176,8 +176,8 @@ def ingest_mock_products() -> None:
         },
         {
             "item_id": "p008",
-            "title": "牧高笛露营折叠蛋卷桌椅套装",
-            "tags": "露营 户外 便携 居家阳台",
+            "title": "MobiGarden Foldable Camping Roll-Top Table & Chair Set",
+            "tags": "camping outdoor portable home patio",
             "category": "outdoor",
             "brand": "MobiGarden",
             "price": 429.0,
@@ -187,8 +187,8 @@ def ingest_mock_products() -> None:
         },
         {
             "item_id": "p009",
-            "title": "Fellow Stagg EKG 温控手冲咖啡壶",
-            "tags": "居家 咖啡 桌面美学 极简设计",
+            "title": "Fellow Stagg EKG Temperature-Controlled Pour-Over Kettle",
+            "tags": "home coffee desk-setup aesthetic minimalist design",
             "category": "home",
             "brand": "Fellow",
             "price": 1299.0,
@@ -198,8 +198,8 @@ def ingest_mock_products() -> None:
         },
         {
             "item_id": "p010",
-            "title": "Shokz 韶音 OpenRun Pro 骨传导运动耳机",
-            "tags": "运动 跑步 无线 蓝牙耳机 户外",
+            "title": "Shokz OpenRun Pro Bone Conduction Sports Headphones",
+            "tags": "sports running wireless bluetooth headphones outdoor",
             "category": "audio",
             "brand": "Shokz",
             "price": 1298.0,
@@ -214,7 +214,7 @@ def ingest_mock_products() -> None:
         for item in raw_items
     ]
     helpers.bulk(client, actions, refresh=True)
-    print(f"成功写入 {len(raw_items)} 条模拟商品数据。")
+    print(f"Successfully ingested {len(raw_items)} mock products.")
 
 
 def recommend_for_user(
@@ -224,7 +224,7 @@ def recommend_for_user(
     purchased_ids: list[str],
     top_k: int = 5,
 ) -> None:
-    """执行混合推荐查询：BM25 标签 + 热度饱和加权 + k-NN 向量召回 + 库存与去重过滤"""
+    """Run hybrid recommendation query: BM25 tags + popularity saturation boost + k-NN vector retrieval + inventory & deduplication filters."""
     norm_user_vec = normalize(user_vector)
 
     query_body = {
@@ -233,7 +233,7 @@ def recommend_for_user(
         "query": {
             "hybrid": {
                 "queries": [
-                    # 路 1：标签/文本匹配 + 热度 rank_feature 饱和加权
+                    # Channel 1: Tag/text match + popularity rank_feature saturation boost
                     {
                         "bool": {
                             "filter": [{"term": {"in_stock": True}}],
@@ -250,7 +250,7 @@ def recommend_for_user(
                             ],
                         }
                     },
-                    # 路 2：用户兴趣向量 k-NN 召回（内嵌相同的库存与已购过滤）
+                    # Channel 2: User interest vector k-NN retrieval (with identical inventory & purchased filters)
                     {
                         "knn": {
                             "item_vector": {
@@ -276,12 +276,12 @@ def recommend_for_user(
         params={"search_pipeline": PIPELINE_NAME},
     )
 
-    print(f"\n=== 用户 [{user_name}] 的 Top-{top_k} 混合推荐结果 ===")
+    print(f"\n=== Top-{top_k} Hybrid Recommendations for User [{user_name}] ===")
     for rank, hit in enumerate(resp["hits"]["hits"], start=1):
         src = hit["_source"]
         print(
             f"{rank}. [{src['item_id']}] {src['title']} "
-            f"| 类目: {src['category']} | 价格: ¥{src['price']} | 融合得分: {hit['_score']:.4f}"
+            f"| Category: {src['category']} | Price: CNY {src['price']} | Hybrid Score: {hit['_score']:.4f}"
         )
 
 
@@ -291,19 +291,19 @@ if __name__ == "__main__":
     setup_index()
     ingest_mock_products()
 
-    # 场景 A：高端数码与音频发烧友（已买过 p001，过滤掉不重复推荐）
+    # Scenario A: High-end tech & audio enthusiast (already bought p001, filter out to avoid duplicate recommendations)
     recommend_for_user(
-        user_name="数码音频极客 (已购 Sony XM5)",
-        preferred_tags="降噪 无线 旗舰 便携",
+        user_name="Tech & Audio Geek (Purchased Sony XM5)",
+        preferred_tags="noise-canceling wireless flagship portable",
         user_vector=[0.9, 0.9, 0.1, 0.2, 0.1, 0.95, 0.85, 0.85],
         purchased_ids=["p001"],
         top_k=5,
     )
 
-    # 场景 B：热爱户外与居家美学的用户
+    # Scenario B: Outdoor camping & home aesthetics enthusiast
     recommend_for_user(
-        user_name="户外露营与居家生活家",
-        preferred_tags="户外 露营 居家 便携",
+        user_name="Outdoor Camping & Home Lifestyle Enthusiast",
+        preferred_tags="outdoor camping home portable",
         user_vector=[0.1, 0.1, 0.9, 0.85, 0.5, 0.6, 0.7, 0.9],
         purchased_ids=[],
         top_k=5,

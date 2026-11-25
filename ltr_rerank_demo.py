@@ -11,19 +11,19 @@ client = OpenSearch(hosts=[{"host": "localhost", "port": 9200}], use_ssl=False)
 
 
 def init_ltr_store() -> None:
-    """初始化 .ltrstore 索引（幂等操作）"""
+    """Initialize the .ltrstore index (idempotent)."""
     try:
         client.transport.perform_request("PUT", "/_ltr")
-        print("LTR 存储 (.ltrstore) 初始化成功。")
+        print("LTR store (.ltrstore) initialized successfully.")
     except exceptions.RequestError as e:
         if "resource_already_exists_exception" in str(e):
-            print("LTR 存储 (.ltrstore) 已存在，跳过初始化。")
+            print("LTR store (.ltrstore) already exists, skipping initialization.")
         else:
             raise
 
 
 def create_featureset() -> None:
-    """清理旧模型/特征集并注册新的特征集 rec_features"""
+    """Clean up old model/featureset and register the new featureset rec_features."""
     for path in [
         f"/_ltr/_model/{MODEL_NAME}",
         f"/_ltr/_featureset/{FEATURESET_NAME}",
@@ -71,22 +71,22 @@ def create_featureset() -> None:
     client.transport.perform_request(
         "POST", f"/_ltr/_featureset/{FEATURESET_NAME}", body=featureset_body
     )
-    print(f"特征集 [{FEATURESET_NAME}] 注册成功。")
+    print(f"Featureset [{FEATURESET_NAME}] registered successfully.")
 
 
 def log_features_for_judgments() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """利用 ext.ltr_log 从 OpenSearch 实时抽取标注样本的特征矩阵"""
-    # 模拟标注集：(qid, preferred_tags, target_category, {item_id: 相关性等级 0~3})
+    """Use ext.ltr_log to extract the feature matrix for labeled judgment samples from OpenSearch."""
+    # Mock judgment set: (qid, preferred_tags, target_category, {item_id: relevance grade 0~3})
     judgment_sessions = [
         (
             1,
-            "降噪 无线 旗舰",
+            "noise-canceling wireless flagship",
             "audio",
             {"p001": 3, "p002": 3, "p010": 2, "p003": 1, "p005": 1, "p009": 0},
         ),
         (
             2,
-            "户外 露营 便携",
+            "outdoor camping portable",
             "outdoor",
             {"p007": 3, "p008": 3, "p010": 2, "p002": 1, "p006": 0, "p009": 0},
         ),
@@ -137,14 +137,14 @@ def log_features_for_judgments() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     X = np.array(X_rows, dtype=np.float32)
     y = np.array(y_rows, dtype=np.int32)
     qid_arr = np.array(qid_rows, dtype=np.int32)
-    print(f"特征日志抽取完成：共 {len(X)} 条样本，特征维度 {X.shape[1]}。")
+    print(f"Feature logging complete: {len(X)} samples, feature dimension {X.shape[1]}.")
     return X, y, qid_arr
 
 
 def train_and_upload_xgboost(
     X: np.ndarray, y: np.ndarray, qid: np.ndarray
 ) -> None:
-    """训练 XGBRanker 排序模型并上传至 OpenSearch LTR 存储"""
+    """Train an XGBRanker ranking model and upload it to the OpenSearch LTR store."""
     ranker = xgb.XGBRanker(
         objective="rank:ndcg",
         n_estimators=12,
@@ -174,7 +174,7 @@ def train_and_upload_xgboost(
         f"/_ltr/_featureset/{FEATURESET_NAME}/_createmodel",
         body=model_payload,
     )
-    print(f"XGBoost 模型 [{MODEL_NAME}] 训练并上传成功（共 {len(trees_json)} 棵树）。")
+    print(f"XGBoost model [{MODEL_NAME}] trained and uploaded successfully ({len(trees_json)} trees).")
 
 
 def search_with_ltr_rescore(
@@ -183,7 +183,7 @@ def search_with_ltr_rescore(
     purchased_ids: list[str],
     top_k: int = 5,
 ) -> None:
-    """第一阶段轻量召回 + 第二阶段 LTR XGBoost rescore 重排"""
+    """Stage 1 lightweight retrieval + Stage 2 LTR XGBoost rescore reranking."""
     query_body = {
         "size": top_k,
         "_source": ["item_id", "title", "category", "price"],
@@ -221,18 +221,18 @@ def search_with_ltr_rescore(
     }
 
     resp = client.search(index=INDEX_NAME, body=query_body)
-    print(f"\n=== LTR Rescore 重排推荐结果（标签: '{preferred_tags}', 目标类目: {target_category}）===")
+    print(f"\n=== LTR Rescore Reranked Recommendations (Tags: '{preferred_tags}', Target Category: {target_category}) ===")
     for rank, hit in enumerate(resp["hits"]["hits"], start=1):
         src = hit["_source"]
         print(
             f"{rank}. [{src['item_id']}] {src['title']} "
-            f"| 类目: {src['category']} | 价格: ¥{src['price']} | LTR 得分: {hit['_score']:.4f}"
+            f"| Category: {src['category']} | Price: CNY {src['price']} | LTR Score: {hit['_score']:.4f}"
         )
 
 
 if __name__ == "__main__":
     if not client.indices.exists(index=INDEX_NAME):
-        raise RuntimeError("请先运行 python rec_demo.py 初始化 rec_products 索引。")
+        raise RuntimeError("Please run `python rec_demo.py` first to initialize the rec_products index.")
 
     init_ltr_store()
     create_featureset()
@@ -240,7 +240,7 @@ if __name__ == "__main__":
     train_and_upload_xgboost(X_mat, y_vec, qids)
 
     search_with_ltr_rescore(
-        preferred_tags="降噪 无线 旗舰",
+        preferred_tags="noise-canceling wireless flagship",
         target_category="audio",
         purchased_ids=["p001"],
         top_k=5,

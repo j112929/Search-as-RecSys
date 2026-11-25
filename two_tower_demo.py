@@ -4,23 +4,23 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from opensearchpy import OpenSearch, helpers
 
-# 复用 rec_demo.py 中的索引与管道配置
+# Reuse index and pipeline configuration from rec_demo.py
 INDEX_NAME = "rec_products"
 PIPELINE_NAME = "rec-hybrid-pipeline"
 EMBED_DIM = 8
 
-# 1. 商品基础元数据（用于 Item 塔融合类目特征解决冷启动）
+# 1. Item metadata (used by the Item Tower to fuse category features for cold start)
 ITEMS = [
-    {"item_id": "p001", "category": "audio", "title": "Sony WH-1000XM5 降噪耳机"},
-    {"item_id": "p002", "category": "audio", "title": "Bose QuietComfort Ultra 耳塞"},
-    {"item_id": "p003", "category": "audio", "title": "国产性价比降噪蓝牙耳机 AirLite"},
-    {"item_id": "p004", "category": "audio", "title": "缺货限量版 Hi-Fi 监听耳机"},
-    {"item_id": "p005", "category": "electronics", "title": "Apple MacBook Air M3 笔记本"},
-    {"item_id": "p006", "category": "electronics", "title": "Keychron K2 Pro 无线机械键盘"},
-    {"item_id": "p007", "category": "outdoor", "title": "始祖鸟 Beta 防水冲锋衣"},
-    {"item_id": "p008", "category": "outdoor", "title": "牧高笛露营折叠蛋卷桌椅套装"},
-    {"item_id": "p009", "category": "home", "title": "Fellow Stagg EKG 手冲咖啡壶"},
-    {"item_id": "p010", "category": "audio", "title": "Shokz 韶音 OpenRun Pro 运动耳机"},
+    {"item_id": "p001", "category": "audio", "title": "Sony WH-1000XM5 Noise-Canceling Headphones"},
+    {"item_id": "p002", "category": "audio", "title": "Bose QuietComfort Ultra Earbuds"},
+    {"item_id": "p003", "category": "audio", "title": "AirLite Budget Noise-Canceling Earbuds"},
+    {"item_id": "p004", "category": "audio", "title": "Out-of-Stock Limited Hi-Fi Studio Headphones"},
+    {"item_id": "p005", "category": "electronics", "title": "Apple MacBook Air M3 Laptop"},
+    {"item_id": "p006", "category": "electronics", "title": "Keychron K2 Pro Wireless Mechanical Keyboard"},
+    {"item_id": "p007", "category": "outdoor", "title": "Arc'teryx Beta Waterproof Hardshell Jacket"},
+    {"item_id": "p008", "category": "outdoor", "title": "MobiGarden Foldable Camping Table & Chair Set"},
+    {"item_id": "p009", "category": "home", "title": "Fellow Stagg EKG Pour-Over Coffee Kettle"},
+    {"item_id": "p010", "category": "audio", "title": "Shokz OpenRun Pro Sports Headphones"},
 ]
 
 CAT2IDX = {"audio": 0, "electronics": 1, "outdoor": 2, "home": 3}
@@ -28,7 +28,7 @@ SEG2IDX = {"tech_geek": 0, "outdoor_lover": 1, "home_aesthetic": 2}
 ITEM2IDX = {it["item_id"]: idx for idx, it in enumerate(ITEMS)}
 PAD_IDX = len(ITEMS)
 
-# 2. 模拟用户交互样本：(用户分群, 历史点击序列, 正样本目标商品)
+# 2. Mock user interaction samples: (user_segment, click_history, positive_target_item)
 RAW_INTERACTIONS = [
     ("tech_geek", ["p001", "p005"], "p002"),
     ("tech_geek", ["p002", "p006"], "p001"),
@@ -69,7 +69,7 @@ class RecDataset(Dataset):
         return self.samples[idx]
 
 
-# 3. 双塔模型定义
+# 3. Two-Tower model definition
 class UserTower(nn.Module):
     def __init__(self, num_segments: int, num_items: int, embed_dim: int):
         super().__init__()
@@ -156,7 +156,7 @@ def train_two_tower(epochs: int = 120) -> TwoTowerModel:
 
 
 def export_and_sync_items(model: TwoTowerModel, client: OpenSearch) -> None:
-    """用 Item Tower 导出全量商品向量，并局部更新写入 OpenSearch"""
+    """Export all item embeddings with the Item Tower and partially update them in OpenSearch."""
     model.eval()
     item_indices = torch.arange(len(ITEMS), dtype=torch.long)
     cat_indices = torch.tensor([CAT2IDX[it["category"]] for it in ITEMS], dtype=torch.long)
@@ -175,7 +175,7 @@ def export_and_sync_items(model: TwoTowerModel, client: OpenSearch) -> None:
         for i in range(len(ITEMS))
     ]
     success, errors = helpers.bulk(client, actions, refresh=True, raise_on_error=False)
-    print(f"已将双塔 Item 向量同步到 OpenSearch：成功 {success} 条，失败 {len(errors)} 条。")
+    print(f"Synced Two-Tower item vectors to OpenSearch: {success} succeeded, {len(errors)} failed.")
 
 
 def query_with_user_tower(
@@ -186,7 +186,7 @@ def query_with_user_tower(
     preferred_tags: str,
     top_k: int = 5,
 ) -> None:
-    """用 User Tower 实时推理生成 user_vector，并执行 OpenSearch 混合推荐查询"""
+    """Infer user_vector in real time using the User Tower and run an OpenSearch hybrid recommendation query."""
     model.eval()
     hist_idx = [ITEM2IDX[i] for i in history_ids][-3:]
     hist_idx = [PAD_IDX] * (3 - len(hist_idx)) + hist_idx
@@ -240,16 +240,16 @@ def query_with_user_tower(
         body=query_body,
         params={"search_pipeline": PIPELINE_NAME},
     )
-    print(f"\n=== 双塔实时推荐（分群: {seg_name}, 历史: {history_ids}）===")
+    print(f"\n=== Two-Tower Real-Time Recommendations (Segment: {seg_name}, History: {history_ids}) ===")
     for rank, hit in enumerate(resp["hits"]["hits"], start=1):
         src = hit["_source"]
-        print(f"{rank}. [{src['item_id']}] {src['title']} | 类目: {src['category']} | 得分: {hit['_score']:.4f}")
+        print(f"{rank}. [{src['item_id']}] {src['title']} | Category: {src['category']} | Score: {hit['_score']:.4f}")
 
 
 if __name__ == "__main__":
     os_client = OpenSearch(hosts=[{"host": "localhost", "port": 9200}], use_ssl=False)
     if not os_client.indices.exists(index=INDEX_NAME):
-        raise RuntimeError("请先运行 python rec_demo.py 初始化索引与 search_pipeline。")
+        raise RuntimeError("Please run `python rec_demo.py` first to initialize the index and search_pipeline.")
 
     trained_model = train_two_tower(epochs=120)
     export_and_sync_items(trained_model, os_client)
@@ -259,5 +259,5 @@ if __name__ == "__main__":
         client=os_client,
         seg_name="tech_geek",
         history_ids=["p001", "p005"],
-        preferred_tags="降噪 无线 旗舰",
+        preferred_tags="noise-canceling wireless flagship",
     )

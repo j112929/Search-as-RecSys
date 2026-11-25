@@ -1,36 +1,36 @@
 # Search-as-RecSys (OpenSearch Demo)
 
-基于 **OpenSearch 2.19** 实现的“基于搜索的推荐系统（Search-as-RecSys）”最小可运行 Demo，演示如何在同一搜索引擎中完成多路召回、硬过滤与分数融合：
+A minimal runnable **Search-as-RecSys** demo built on **OpenSearch 2.19**, demonstrating how to perform multi-channel retrieval, hard filtering, and score fusion within a single search engine:
 
-- **标签 / 关键词召回（BM25）**：匹配用户历史偏好标签
-- **热度特征加权（`rank_feature`）**：使用饱和函数引入商品热度分
-- **向量语义 / 双塔召回（`knn_vector` + HNSW）**：基于用户兴趣向量做近邻召回
-- **混合检索管道（`search_pipeline`）**：对两路分数进行 `min_max` 归一化并按权重加权融合
-- **Learning to Rank (LTR) 精排**：使用 `sltr`、`ext.ltr_log` 与 XGBoost 模型在 `rescore` 阶段进行重排
-- **业务规则过滤**：支持库存状态（`in_stock: true`）与已购商品去重（`must_not`）
+- **Tag / Keyword Retrieval (BM25)**: Matches user historical preference tags
+- **Popularity Feature Boosting (`rank_feature`)**: Incorporates item popularity scores via a saturation function
+- **Vector Semantic / Two-Tower Retrieval (`knn_vector` + HNSW)**: Performs nearest-neighbor retrieval based on user interest vectors
+- **Hybrid Search Pipeline (`search_pipeline`)**: Applies `min_max` normalization across retrieval channels and combines scores using weighted arithmetic mean
+- **Learning to Rank (LTR) Reranking**: Uses `sltr`, `ext.ltr_log`, and an XGBoost model to rerank candidates during the `rescore` phase
+- **Business Rule Filtering**: Supports stock availability filtering (`in_stock: true`) and purchased-item deduplication (`must_not`)
 
-## 快速运行
+## Quick Start
 
-1. 启动单节点 OpenSearch：
+1. Start a single-node OpenSearch instance:
 
 ```bash
 docker compose up -d
 ```
 
-2. 安装 Python 依赖并运行基础混合推荐 Demo：
+2. Install Python dependencies and run the basic hybrid recommendation demo:
 
 ```bash
 pip install -r requirements.txt
 python rec_demo.py
 ```
 
-3. 运行 PyTorch 双塔模型训练、向量局部同步与实时推荐 Demo（需先运行 `rec_demo.py` 初始化索引）：
+3. Run the PyTorch Two-Tower model training, partial vector sync, and real-time recommendation demo (run `rec_demo.py` first to initialize the index):
 
 ```bash
 python two_tower_demo.py
 ```
 
-4. 运行 OpenSearch LTR 特征日志抽取、XGBoost 训练与 `rescore` 重排 Demo（需先运行 `rec_demo.py` 初始化索引）：
+4. Run the OpenSearch LTR feature logging, XGBoost training, and `rescore` reranking demo (run `rec_demo.py` first to initialize the index):
 
 ```bash
 python ltr_rerank_demo.py
